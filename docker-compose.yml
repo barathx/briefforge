@@ -1,0 +1,74 @@
+version: "3.9"
+
+networks:
+  briefforge-net:
+    driver: bridge
+
+volumes:
+  ollama-data:
+
+services:
+  # ── Ollama local LLM runtime ──────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: bf-ollama
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - briefforge-net
+    restart: unless-stopped
+    # Pull the model on first start; comment out if already cached
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull mistral:7b-instruct && wait"]
+
+  # ── Python FastAPI AI microservice ────────────────────────────────────────
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: bf-ai-service
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - AI_MODEL=${AI_MODEL:-mistral:7b-instruct}
+    ports:
+      - "8000:8000"
+    networks:
+      - briefforge-net
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  # ── Node.js / Express REST backend ────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bf-backend
+    env_file:
+      - ./backend/.env
+    environment:
+      - AI_SERVICE_URL=http://ai-service:8000
+    ports:
+      - "3000:3000"
+    networks:
+      - briefforge-net
+    depends_on:
+      - ai-service
+    restart: unless-stopped
+
+  # ── React / Vite frontend (dev server) ────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bf-frontend
+    environment:
+      - VITE_API_BASE_URL=http://localhost:3000
+    ports:
+      - "5173:5173"
+    networks:
+      - briefforge-net
+    depends_on:
+      - backend
+    restart: unless-stopped
