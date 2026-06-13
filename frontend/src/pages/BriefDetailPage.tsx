@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import PlatformTabs from '../components/PlatformTabs';
@@ -33,6 +33,8 @@ export default function BriefDetailPage() {
   const [activePlatform, setActivePlatform] = useState<string>('');
   const [regeneratingKeys, setRegeneratingKeys] = useState<Record<string, boolean>>({});
   const [retrying, setRetrying] = useState(false);
+  // Track whether we've set the initial active platform so loadData doesn't re-init it
+  const platformInitialised = useRef(false);
 
   const loadData = useCallback(async (showLoading = true) => {
     if (!id) return;
@@ -42,10 +44,10 @@ export default function BriefDetailPage() {
       setBrief(data.brief);
       setGenerations(data.generations || []);
 
-      // If active platform is not set yet, set it to the first platform in the brief list
-      if (!activePlatform && data.brief?.platforms?.length > 0) {
-        // Normalise name (e.g. 'Instagram' to match tabs)
+      // Only set the active platform on first load
+      if (!platformInitialised.current && data.brief?.platforms?.length > 0) {
         setActivePlatform(data.brief.platforms[0]);
+        platformInitialised.current = true;
       }
     } catch (err: any) {
       console.error(err);
@@ -53,7 +55,7 @@ export default function BriefDetailPage() {
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, [id, activePlatform]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initial load
   useEffect(() => {
@@ -76,13 +78,12 @@ export default function BriefDetailPage() {
     if (!id) return;
     setRetrying(true);
     try {
-      toast.loading('Starting generation...');
       await generateContent(id);
-      toast.dismiss();
-      toast.success('Generation started successfully!');
-      loadData();
+      toast.success('Generation started! Content will appear shortly...');
+      // Optimistically set status to processing so polling kicks in
+      setBrief((prev) => prev ? { ...prev, status: 'processing' } : prev);
+      loadData(false);
     } catch (err: any) {
-      toast.dismiss();
       console.error(err);
       toast.error('Failed to trigger generation');
     } finally {

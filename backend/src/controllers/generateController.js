@@ -1,7 +1,11 @@
 import supabase from '../db/supabase.js';
 import { callAIGenerate } from '../services/aiClient.js';
 
-const GENERATION_TYPES = ['caption', 'ad_copy', 'hook', 'cta', 'concept'];
+// Types that apply per-platform
+const PLATFORM_TYPES = ['caption', 'ad_copy'];
+// Types that are global (not per-platform)
+const GLOBAL_TYPES = ['hook', 'cta', 'concept'];
+const ALL_TYPES = [...PLATFORM_TYPES, ...GLOBAL_TYPES];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -37,7 +41,7 @@ async function setBriefStatus(briefId, status) {
 async function insertGeneration({ brief_id, type, platform, content }) {
   const { data, error } = await supabase
     .from('generations')
-    .insert({ brief_id, type, platform, content })
+    .insert({ brief_id, type, platform: platform ?? null, content })
     .select('*')
     .single();
 
@@ -60,76 +64,80 @@ export async function triggerGeneration(req, res) {
     return res.status(404).json({ error: 'Brief not found' });
   }
 
-  // 2. Mark as processing
+  // 2. Mark as processing immediately so the UI can show the spinner
   await setBriefStatus(briefId, 'processing');
 
+  // 3. Respond to the client immediately — generation runs async
+  res.status(202).json({ message: 'Generation started', briefId });
+
+  // 4. Run generation asynchronously (fire-and-forget from the request lifecycle)
   try {
-    // 3. Call AI service
     const aiResponse = await callAIGenerate({
       brief,
       tone: brief.tone,
       platforms: brief.platforms,
-      types: GENERATION_TYPES,
+      types: ALL_TYPES,
     });
 
     /**
-     * Expected AI response shape:
+     * normalised AI response shape from aiClient.js:
      * {
-     *   results: {
-     *     [platform]: {
-     *       [type]: string | string[]
-     *     }
-     *   }
+     *   platformResults: { [platform]: { caption: [...], ad_copy: [...] } },
+     *   globals: { hook: [...], cta: [...], concept: [...] }
      * }
      */
-    const results = aiResponse.results ?? {};
+    const { platformResults = {}, globals = {} } = aiResponse;
 
-    // 4. Insert a generation row for each type × platform combination
     const insertPromises = [];
 
+    // Insert per-platform types (caption, ad_copy)
     for (const platform of brief.platforms) {
-      for (const type of GENERATION_TYPES) {
-        const rawContent = results[platform]?.[type] ?? null;
-
-        if (rawContent !== null) {
+      for (const type of PLATFORM_TYPES) {
+        const content = platformResults[platform]?.[type];
+        if (content && content.length > 0) {
           insertPromises.push(
-            insertGeneration({
-              brief_id: briefId,
-              type,
-              platform,
-              content: typeof rawContent === 'string'
-                ? { text: rawContent }
-                : rawContent,
-            })
+            insertGeneration({ brief_id: briefId, type, platform, content })
           );
         }
       }
     }
 
-    const generations = await Promise.all(insertPromises);
+    // Insert global types (hook, cta, concept) — one row each, no platform
+    for (const type of GLOBAL_TYPES) {
+      const content = globals[type];
+      if (content && content.length > 0) {
+        insertPromises.push(
+          insertGeneration({ brief_id: briefId, type, platform: null, content })
+        );
+      }
+    }
+
+    await Promise.all(insertPromises);
 
     // 5. Mark as complete
     await setBriefStatus(briefId, 'complete');
-
-    return res.status(200).json({ generations });
   } catch (err) {
-    console.error('[triggerGeneration]', err);
-    // Set brief to error state so the client can surface it
+    console.error('[triggerGeneration] async error:', err);
     await setBriefStatus(briefId, 'error');
-    return res.status(502).json({ error: 'AI generation failed', detail: err.message });
   }
 }
 
 /**
  * POST /api/generate/:briefId/regenerate?type=caption&platform=instagram
- * Re-generates a single type/platform pair, replacing the old row.
+ * Re-generates a single type/platform pair (or a global type), replacing the old row.
  */
 export async function regenerate(req, res) {
   const { briefId } = req.params;
   const { type, platform } = req.query;
 
-  if (!type || !platform) {
-    return res.status(400).json({ error: 'Query params "type" and "platform" are required' });
+  if (!type) {
+    return res.status(400).json({ error: 'Query param "type" is required' });
+  }
+
+  // platform is only required for per-platform types
+  const isGlobal = GLOBAL_TYPES.includes(type);
+  if (!isGlobal && !platform) {
+    return res.status(400).json({ error: 'Query param "platform" is required for caption and ad_copy types' });
   }
 
   // 1. Verify ownership
@@ -138,49 +146,53 @@ export async function regenerate(req, res) {
     return res.status(404).json({ error: 'Brief not found' });
   }
 
-  await setBriefStatus(briefId, 'processing');
-
   try {
-    // 2. Call AI service for the specific type/platform
+    // 2. Call AI service for the specific type
+    const targetPlatforms = isGlobal ? brief.platforms : [platform];
     const aiResponse = await callAIGenerate({
       brief,
       tone: brief.tone,
-      platforms: [platform],
+      platforms: targetPlatforms,
       types: [type],
     });
 
-    const results = aiResponse.results ?? {};
-    const rawContent = results[platform]?.[type] ?? null;
+    const { platformResults = {}, globals = {} } = aiResponse;
 
-    if (rawContent === null) {
-      await setBriefStatus(briefId, 'complete');
-      return res.status(502).json({ error: 'AI service returned no content for the requested type/platform' });
+    let content;
+    if (isGlobal) {
+      content = globals[type] ?? null;
+    } else {
+      content = platformResults[platform]?.[type] ?? null;
     }
 
-    // 3. Delete the existing generation row (if any) for this type+platform
-    await supabase
+    if (!content || content.length === 0) {
+      return res.status(502).json({ error: 'AI service returned no content for the requested type' });
+    }
+
+    // 3. Delete existing generation row (if any)
+    const deleteQuery = supabase
       .from('generations')
       .delete()
       .eq('brief_id', briefId)
-      .eq('type', type)
-      .eq('platform', platform);
+      .eq('type', type);
+
+    if (isGlobal) {
+      await deleteQuery.is('platform', null);
+    } else {
+      await deleteQuery.eq('platform', platform);
+    }
 
     // 4. Insert fresh generation
     const generation = await insertGeneration({
       brief_id: briefId,
       type,
-      platform,
-      content: typeof rawContent === 'string'
-        ? { text: rawContent }
-        : rawContent,
+      platform: isGlobal ? null : platform,
+      content,
     });
-
-    await setBriefStatus(briefId, 'complete');
 
     return res.status(200).json({ generation });
   } catch (err) {
     console.error('[regenerate]', err);
-    await setBriefStatus(briefId, 'error');
     return res.status(502).json({ error: 'AI regeneration failed', detail: err.message });
   }
 }

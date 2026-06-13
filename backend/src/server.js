@@ -30,6 +30,23 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
+// ── Root route ────────────────────────────────────────────────────────────────
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'BriefForge API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health:    'GET  /health',
+      auth:      'POST /api/auth/signup  |  POST /api/auth/login',
+      clients:   'GET  /api/clients      |  POST /api/clients',
+      briefs:    'GET  /api/briefs       |  POST /api/briefs  |  GET /api/briefs/:id  |  DELETE /api/briefs/:id',
+      generate:  'POST /api/generate/:briefId  |  POST /api/generate/:briefId/regenerate',
+      dashboard: 'GET  /api/dashboard/stats',
+    },
+  });
+});
+
 // ── Global error handler ──────────────────────────────────────────────────────
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {

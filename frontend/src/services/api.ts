@@ -190,10 +190,10 @@ export const login = (data: LoginData): Promise<AuthResponse> =>
 // ─── Clients ─────────────────────────────────────────────────────
 
 export const getClients = (): Promise<Client[]> =>
-  api.get<Client[]>('/api/clients').then((r) => r.data);
+  api.get<{ clients: Client[] }>('/api/clients').then((r) => r.data.clients ?? []);
 
 export const createClient = (data: CreateClientData): Promise<Client> =>
-  api.post<Client>('/api/clients', data).then((r) => r.data);
+  api.post<{ client: Client }>('/api/clients', data).then((r) => r.data.client);
 
 // ─── Briefs ──────────────────────────────────────────────────────
 
@@ -250,20 +250,21 @@ export const getDashboardStats = (): Promise<DashboardStats> =>
 
 // ─── Generate ────────────────────────────────────────────────────
 
-export const generateContent = (briefId: string): Promise<Generation[]> =>
-  api.post<{ generations: any[] }>(`/api/generate/${briefId}`).then((r) =>
-    (r.data.generations || []).map(normaliseGeneration)
-  );
+// generateContent kicks off async generation; the brief status will change to
+// 'complete' once done. The caller should poll getBrief() to check status.
+export const generateContent = (briefId: string): Promise<void> =>
+  api.post(`/api/generate/${briefId}`).then(() => undefined);
 
 export const regenerateContent = (
   briefId: string,
   type: Generation['type'],
   platform?: string
-): Promise<Generation> =>
-  api
-    .post<{ generation: any }>(`/api/generate/${briefId}/regenerate`, null, {
-      params: { type, platform },
-    })
+): Promise<Generation> => {
+  const params: any = { type };
+  if (platform) params.platform = platform; // omit for global types
+  return api
+    .post<{ generation: any }>(`/api/generate/${briefId}/regenerate`, null, { params })
     .then((r) => normaliseGeneration(r.data.generation));
+};
 
 export default api;
