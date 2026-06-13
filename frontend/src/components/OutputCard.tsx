@@ -109,7 +109,7 @@ export default function OutputCard({ type, platform, content, onRegenerate, isRe
             )}
             {item.tagline && (
               <p className="text-cyan-400 text-xs italic">
-                "{item.tagline}"
+                &ldquo;{item.tagline}&rdquo;
               </p>
             )}
             {item.description && (

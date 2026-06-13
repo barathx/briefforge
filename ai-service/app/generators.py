@@ -164,11 +164,12 @@ async def generate_all(
     model: str,
 ) -> dict[str, Any]:
     """
-    Orchestrate all requested content generators concurrently.
+    Orchestrate all requested content generators sequentially.
 
-    Each generator runs as an independent coroutine via ``asyncio.gather``.
-    If a generator raises an exception it is caught, logged, and replaced
-    with a safe empty value — so one failure never blocks the others.
+    Ollama processes prompts one at a time, so running all generators
+    concurrently just causes ReadTimeout errors on the later tasks.
+    We run each generator sequentially instead, which is reliable and
+    still fast enough for typical briefs (~30–90s total).
 
     Args:
         brief:       Dict representation of BriefData.
@@ -184,26 +185,10 @@ async def generate_all(
     """
     client = OllamaClient(host=ollama_host, model=model)
 
-    # Build a map of type → coroutine so we can run only what's requested
     type_set = set(types)
 
-    # We gather all coroutines into a flat list, keeping track of which key
-    # each result belongs to.
-    tasks: list[tuple[str, Any]] = []  # (key, coroutine)
-
-    if "captions" in type_set:
-        tasks.append(("captions", generate_captions(client, brief, platforms, tone)))
-    if "ad_copy" in type_set:
-        tasks.append(("ad_copy", generate_ad_copy(client, brief, platforms, tone)))
-    if "hooks" in type_set:
-        tasks.append(("hooks", generate_hooks(client, brief, tone)))
-    if "ctas" in type_set:
-        tasks.append(("ctas", generate_ctas(client, brief, tone)))
-    if "concepts" in type_set:
-        tasks.append(("concepts", generate_concepts(client, brief, tone)))
-
     # Default safe-empty values per type
-    defaults: dict[str, Any] = {
+    output: dict[str, Any] = {
         "captions": {},
         "ad_copy": {},
         "hooks": [],
@@ -211,33 +196,45 @@ async def generate_all(
         "concepts": [],
     }
 
-    if not tasks:
+    if not type_set:
         logger.warning("generate_all called with no recognised types: %s", types)
-        return defaults
-
-    keys = [k for k, _ in tasks]
-    coros = [c for _, c in tasks]
+        return output
 
     logger.info(
-        "Running %d generator(s) concurrently: %s",
-        len(coros),
-        ", ".join(keys),
+        "Running %d generator(s) sequentially: %s",
+        len(type_set),
+        ", ".join(sorted(type_set)),
     )
 
-    results = await asyncio.gather(*coros, return_exceptions=True)
+    # Run each generator sequentially to avoid Ollama queue timeouts
+    if "captions" in type_set:
+        try:
+            output["captions"] = await generate_captions(client, brief, platforms, tone)
+        except Exception as exc:
+            logger.error("Generator 'captions' failed: %s", exc, exc_info=exc)
 
-    output = dict(defaults)  # start with safe defaults
+    if "ad_copy" in type_set:
+        try:
+            output["ad_copy"] = await generate_ad_copy(client, brief, platforms, tone)
+        except Exception as exc:
+            logger.error("Generator 'ad_copy' failed: %s", exc, exc_info=exc)
 
-    for key, result in zip(keys, results):
-        if isinstance(result, Exception):
-            logger.error(
-                "Generator '%s' failed — returning empty result. Error: %s",
-                key,
-                result,
-                exc_info=result,
-            )
-            # defaults already set; no override needed
-        else:
-            output[key] = result
+    if "hooks" in type_set:
+        try:
+            output["hooks"] = await generate_hooks(client, brief, tone)
+        except Exception as exc:
+            logger.error("Generator 'hooks' failed: %s", exc, exc_info=exc)
+
+    if "ctas" in type_set:
+        try:
+            output["ctas"] = await generate_ctas(client, brief, tone)
+        except Exception as exc:
+            logger.error("Generator 'ctas' failed: %s", exc, exc_info=exc)
+
+    if "concepts" in type_set:
+        try:
+            output["concepts"] = await generate_concepts(client, brief, tone)
+        except Exception as exc:
+            logger.error("Generator 'concepts' failed: %s", exc, exc_info=exc)
 
     return output

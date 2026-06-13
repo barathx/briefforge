@@ -121,6 +121,23 @@ app.add_middleware(
 # Routes
 # ---------------------------------------------------------------------------
 
+@app.get("/", tags=["info"])
+async def root():
+    """Root route — service info and available endpoints."""
+    return {
+        "name": "BriefForge AI Service",
+        "version": "1.0.0",
+        "status": "running",
+        "model": settings.AI_MODEL,
+        "ollama_host": settings.OLLAMA_HOST,
+        "docs": "/docs",
+        "endpoints": {
+            "health":   "GET  /health",
+            "generate": "POST /ai/generate",
+        },
+    }
+
+
 @app.get("/health", tags=["health"])
 async def health_check():
     """Liveness probe — returns service status and active model."""

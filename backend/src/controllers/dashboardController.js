@@ -24,26 +24,37 @@ export async function getDashboardStats(req, res, next) {
 
     if (clientsError) throw clientsError;
 
-    // 3. Count generations created today (since midnight UTC)
+    // 3. Count generations created today by first fetching brief IDs owned by user
+    //    then counting generations for those briefs created after midnight UTC today.
+    //    (Supabase JS v2 does not support cross-table .eq() with embedded joins)
     const startOfToday = new Date();
     startOfToday.setUTCHours(0, 0, 0, 0);
 
-    // To count generations, we fetch all generations for briefs owned by this user
-    // created after startOfToday.
-    // We can do a join or subquery. In Supabase JS:
-    const { data: generationsTodayData, error: generationsError } = await supabase
-      .from('generations')
-      .select('id, briefs!inner(user_id)')
-      .eq('briefs.user_id', userId)
-      .gte('created_at', startOfToday.toISOString());
+    // Get brief IDs for this user
+    const { data: userBriefs, error: userBriefsError } = await supabase
+      .from('briefs')
+      .select('id')
+      .eq('user_id', userId);
 
-    if (generationsError) throw generationsError;
+    if (userBriefsError) throw userBriefsError;
 
-    const generationsToday = generationsTodayData ? generationsTodayData.length : 0;
+    let generationsToday = 0;
+    if (userBriefs && userBriefs.length > 0) {
+      const briefIds = userBriefs.map((b) => b.id);
+
+      const { count: genCount, error: generationsError } = await supabase
+        .from('generations')
+        .select('*', { count: 'exact', head: true })
+        .in('brief_id', briefIds)
+        .gte('created_at', startOfToday.toISOString());
+
+      if (generationsError) throw generationsError;
+      generationsToday = genCount || 0;
+    }
 
     return res.status(200).json({
-      totalBriefs: totalBriefs || 0,
-      totalClients: totalClients || 0,
+      totalBriefs:      totalBriefs      || 0,
+      totalClients:     totalClients     || 0,
       generationsToday: generationsToday || 0,
     });
   } catch (err) {

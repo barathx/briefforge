@@ -183,10 +183,11 @@ export default function BriefForm({ onSuccess }: Props) {
       });
 
       toast.success('Brief created! Generating content…');
-      generateContent(brief.id).catch(() => {/* fire and forget */});
+      // Fire-and-forget — generation runs async on the backend
+      generateContent(brief.id).catch(console.error);
       onSuccess(brief.id);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to create brief');
+      toast.error(err?.response?.data?.error ?? err?.response?.data?.message ?? 'Failed to create brief');
     } finally {
       setIsSubmitting(false);
     }
