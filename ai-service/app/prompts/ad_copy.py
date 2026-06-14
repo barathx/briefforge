@@ -40,7 +40,7 @@ def build_ad_copy_prompt(brief: dict, platform: str, tone: str) -> str:
 - Platform : {platform.upper()}
 
 ## Your Task
-Write EXACTLY 3 distinct ad copy variants for a {platform} paid ad campaign.
+Write EXACTLY 2 distinct ad copy variants for a {platform} paid ad campaign.
 
 ### Rules for each variant
 1. **Headline** — maximum 60 characters. Must be attention-grabbing and benefit-focused.
@@ -52,7 +52,7 @@ Write EXACTLY 3 distinct ad copy variants for a {platform} paid ad campaign.
 
 ## Output Format
 Return ONLY valid JSON — no preamble, no explanation, no markdown fences.
-The JSON must match this exact schema (3 objects in the array):
+The JSON must match this exact schema (2 objects in the array):
 {{
   "ad_copy": [
     {{
@@ -62,10 +62,6 @@ The JSON must match this exact schema (3 objects in the array):
     {{
       "headline": "Second headline here",
       "body": "Second body copy here"
-    }},
-    {{
-      "headline": "Third headline here",
-      "body": "Third body copy here"
     }}
   ]
 }}

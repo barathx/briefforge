@@ -67,7 +67,7 @@ export async function callAIGenerate(payload) {
   };
 
   const { data } = await axios.post(`${AI_URL}/ai/generate`, fastapiPayload, {
-    timeout: 180000, // 3 minutes — LLM inference can be slow
+    timeout: 600000, // 10 minutes — LLM inference on CPU can be slow
     headers: { 'Content-Type': 'application/json' },
   });
 

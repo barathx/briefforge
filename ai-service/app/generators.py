@@ -19,6 +19,7 @@ from app.prompts.captions import build_caption_prompt
 from app.prompts.concepts import build_concepts_prompt
 from app.prompts.cta import build_cta_prompt
 from app.prompts.hooks import build_hooks_prompt
+from app.prompts.combined import build_combined_prompt
 
 logger = logging.getLogger("briefforge.ai.generators")
 
@@ -164,12 +165,8 @@ async def generate_all(
     model: str,
 ) -> dict[str, Any]:
     """
-    Orchestrate all requested content generators sequentially.
-
-    Ollama processes prompts one at a time, so running all generators
-    concurrently just causes ReadTimeout errors on the later tasks.
-    We run each generator sequentially instead, which is reliable and
-    still fast enough for typical briefs (~30–90s total).
+    Orchestrate content generation using a single combined prompt to minimise execution time.
+    Falls back to sequential execution in case of parsing errors or failures.
 
     Args:
         brief:       Dict representation of BriefData.
@@ -200,13 +197,37 @@ async def generate_all(
         logger.warning("generate_all called with no recognised types: %s", types)
         return output
 
+    # Try combined single-call generation first
+    logger.info("Attempting combined generation for types: %s", ", ".join(sorted(type_set)))
+    try:
+        prompt = build_combined_prompt(brief, tone, platforms, types)
+        data = await client.generate_json(prompt)
+        
+        # Verify and transfer results
+        all_present = True
+        for t in type_set:
+            if t in data and data[t]:
+                output[t] = data[t]
+            else:
+                # If a requested key is missing or empty, treat as incomplete and fallback
+                all_present = False
+                logger.warning("Combined generation response missing or empty key: %s", t)
+        
+        if all_present:
+            logger.info("Combined generation completed successfully!")
+            return output
+        else:
+            logger.warning("Combined generation was incomplete. Falling back to sequential generation...")
+    except Exception as exc:
+        logger.warning("Combined generation failed with exception: %s. Falling back to sequential...", exc)
+
+    # ─── Sequential Fallback ───
     logger.info(
-        "Running %d generator(s) sequentially: %s",
+        "Running sequential fallback for %d generator(s): %s",
         len(type_set),
         ", ".join(sorted(type_set)),
     )
 
-    # Run each generator sequentially to avoid Ollama queue timeouts
     if "captions" in type_set:
         try:
             output["captions"] = await generate_captions(client, brief, platforms, tone)

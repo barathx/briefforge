@@ -39,17 +39,12 @@ def build_hooks_prompt(brief: dict, tone: str) -> str:
 - Tone of Voice : {tone}
 
 ## Your Task
-Write EXACTLY 5 scroll-stopping opening hook lines.
+Write EXACTLY 3 scroll-stopping opening hook lines.
 
 ### Rules
 1. Every hook must be 100 characters or fewer.
 2. Use pattern-interrupt techniques — each hook should feel unexpected, bold, or irresistible.
-3. Vary the style across the 5 hooks. Use at least 3 of these approaches:
-   - Bold provocative statement
-   - Surprising or counter-intuitive claim
-   - Relatable pain point or frustration
-   - Compelling question that demands an answer
-   - Vivid "what if" scenario
+3. Vary the style across the 3 hooks. Use at least 2 different approaches (provocative statement, counter-intuitive claim, pain point, or question).
 4. Hooks must resonate with the target audience: {audience}.
 5. Match the tone "{tone}".
 6. Do NOT include a call-to-action — hooks only.
@@ -61,9 +56,7 @@ The JSON must match this exact schema:
   "hooks": [
     "Hook line 1 here",
     "Hook line 2 here",
-    "Hook line 3 here",
-    "Hook line 4 here",
-    "Hook line 5 here"
+    "Hook line 3 here"
   ]
 }}
 """

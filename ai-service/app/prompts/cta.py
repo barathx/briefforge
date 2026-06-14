@@ -40,12 +40,10 @@ def build_cta_prompt(brief: dict, tone: str) -> str:
 - Tone of Voice : {tone}
 
 ## Your Task
-Write EXACTLY 5 action-oriented CTA phrases — one for each of the following styles:
+Write EXACTLY 3 action-oriented CTA phrases — one for each of the following styles:
 1. **Urgency** — Create a sense of time-pressure or limited availability.
 2. **Benefit** — Lead with the tangible gain or outcome for the user.
-3. **Question** — Spark curiosity or invite self-reflection.
-4. **Command** — A direct, confident imperative that tells them exactly what to do.
-5. **Social Proof** — Leverage peer validation, numbers, or community momentum.
+3. **Command** — A direct, confident imperative that tells them exactly what to do.
 
 ### Rules
 - Each CTA should be concise — ideally 5–12 words.
@@ -56,14 +54,12 @@ Write EXACTLY 5 action-oriented CTA phrases — one for each of the following st
 
 ## Output Format
 Return ONLY valid JSON — no preamble, no explanation, no markdown fences.
-The JSON must match this exact schema (5 strings in the array, one per style in order):
+The JSON must match this exact schema (3 strings in the array, one per style in order):
 {{
   "ctas": [
     "Urgency CTA here",
     "Benefit CTA here",
-    "Question CTA here",
-    "Command CTA here",
-    "Social Proof CTA here"
+    "Command CTA here"
   ]
 }}
 """

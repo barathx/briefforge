@@ -69,7 +69,7 @@ def build_caption_prompt(brief: dict, platform: str, tone: str) -> str:
 - Every caption MUST stay within the character limit.
 
 ## Your Task
-Generate EXACTLY 5 distinct, high-performing {platform} captions for the product above.
+Generate EXACTLY 3 distinct, high-performing {platform} captions for the product above.
 Each caption must:
 1. Immediately grab attention with a strong opening line.
 2. Reflect the tone "{tone}" throughout.
@@ -85,9 +85,7 @@ The JSON must match this exact schema:
   "captions": [
     "caption 1 text here",
     "caption 2 text here",
-    "caption 3 text here",
-    "caption 4 text here",
-    "caption 5 text here"
+    "caption 3 text here"
   ]
 }}
 """
