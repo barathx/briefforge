@@ -43,7 +43,7 @@ def build_concepts_prompt(brief: dict, tone: str) -> str:
 - Platforms : {platforms_str}
 
 ## Your Task
-Generate EXACTLY 3 distinct, compelling creative campaign concepts.
+Generate EXACTLY 2 distinct, compelling creative campaign concepts.
 
 ### For each concept, provide:
 1. **name** — A memorable 2–5 word title for the concept (e.g. "The Ripple Effect").
@@ -61,7 +61,7 @@ Generate EXACTLY 3 distinct, compelling creative campaign concepts.
 
 ## Output Format
 Return ONLY valid JSON — no preamble, no explanation, no markdown fences.
-The JSON must match this exact schema (3 objects in the array):
+The JSON must match this exact schema (2 objects in the array):
 {{
   "concepts": [
     {{
@@ -75,12 +75,6 @@ The JSON must match this exact schema (3 objects in the array):
       "tagline": "Second tagline here",
       "description": "Description of the second concept.",
       "visual_idea": "Visual direction for the second concept."
-    }},
-    {{
-      "name": "Third Concept Name",
-      "tagline": "Third tagline here",
-      "description": "Description of the third concept.",
-      "visual_idea": "Visual direction for the third concept."
     }}
   ]
 }}

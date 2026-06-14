@@ -17,7 +17,7 @@ class OllamaClient:
     def __init__(self, host: str, model: str) -> None:
         self.host = host.rstrip("/")
         self.model = model
-        self._timeout = httpx.Timeout(180.0, connect=10.0)
+        self._timeout = httpx.Timeout(300.0, connect=10.0)
 
     # ------------------------------------------------------------------
     # Core generation

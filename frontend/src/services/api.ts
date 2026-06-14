@@ -4,7 +4,7 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: (import.meta as any).env?.VITE_API_BASE_URL ?? 'http://localhost:3000',
   headers: { 'Content-Type': 'application/json' },
-  timeout: 30_000,
+  timeout: 180_000,
 });
 
 // ─── Request interceptor: attach token ──────────────────────────

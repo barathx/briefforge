@@ -20,7 +20,7 @@ export type Tone =
 
 interface ToneConfig {
   label: Tone;
-  icon:  React.ComponentType<{ className?: string }>;
+  icon:  React.ComponentType<{ className?: string; color?: string; style?: React.CSSProperties }>;
   color: string;       // accent colour for selected state
   bg:    string;       // subtle bg tint
   desc:  string;
